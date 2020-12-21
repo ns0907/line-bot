@@ -1,315 +1,294 @@
 <?php
-/**
- * CodeIgniter
- *
- * An open source application development framework for PHP
- *
- * This content is released under the MIT License (MIT)
- *
- * Copyright (c) 2014 - 2016, British Columbia Institute of Technology
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- * THE SOFTWARE.
- *
- * @package	CodeIgniter
- * @author	EllisLab Dev Team
- * @copyright	Copyright (c) 2008 - 2014, EllisLab, Inc. (https://ellislab.com/)
- * @copyright	Copyright (c) 2014 - 2016, British Columbia Institute of Technology (http://bcit.ca/)
- * @license	http://opensource.org/licenses/MIT	MIT License
- * @link	https://codeigniter.com
- * @since	Version 1.0.0
- * @filesource
- */
 
-/*
- *---------------------------------------------------------------
- * APPLICATION ENVIRONMENT
- *---------------------------------------------------------------
- *
- * You can load different configurations depending on your
- * current environment. Setting the environment also influences
- * things like logging and error reporting.
- *
- * This can be set to anything, but default usage is:
- *
- *     development
- *     testing
- *     production
- *
- * NOTE: If you change these, also change the error_reporting() code below
- */
-	define('ENVIRONMENT', isset($_SERVER['CI_ENV']) ? $_SERVER['CI_ENV'] : 'development');
+// Composerでインストールしたライブラリを一括読み込み
+require_once __DIR__ . '/vendor/autoload.php';
 
-/*
- *---------------------------------------------------------------
- * ERROR REPORTING
- *---------------------------------------------------------------
- *
- * Different environments will require different levels of error reporting.
- * By default development will show errors but testing and live will hide them.
- */
-switch (ENVIRONMENT)
-{
-	case 'development':
-		error_reporting(-1);
-		ini_set('display_errors', 1);
-	break;
+// アクセストークンを使いCurlHTTPClientをインスタンス化
+$httpClient = new \LINE\LINEBot\HTTPClient\CurlHTTPClient(getenv('CHANNEL_ACCESS_TOKEN'));
+// CurlHTTPClientとシークレットを使いLINEBotをインスタンス化
+$bot = new \LINE\LINEBot($httpClient, ['channelSecret' => getenv('CHANNEL_SECRET')]);
+// LINE Messaging APIがリクエストに付与した署名を取得
+$signature = $_SERVER['HTTP_' . \LINE\LINEBot\Constant\HTTPHeader::LINE_SIGNATURE];
 
-	case 'testing':
-	case 'production':
-		ini_set('display_errors', 0);
-		if (version_compare(PHP_VERSION, '5.3', '>='))
-		{
-			error_reporting(E_ALL & ~E_NOTICE & ~E_DEPRECATED & ~E_STRICT & ~E_USER_NOTICE & ~E_USER_DEPRECATED);
-		}
-		else
-		{
-			error_reporting(E_ALL & ~E_NOTICE & ~E_STRICT & ~E_USER_NOTICE);
-		}
-	break;
-
-	default:
-		header('HTTP/1.1 503 Service Unavailable.', TRUE, 503);
-		echo 'The application environment is not set correctly.';
-		exit(1); // EXIT_ERROR
+// 署名が正当かチェック。正当であればリクエストをパースし配列へ
+// 不正であれば例外の内容を出力
+try {
+  $events = $bot->parseEventRequest(file_get_contents('php://input'), $signature);
+} catch(\LINE\LINEBot\Exception\InvalidSignatureException $e) {
+  error_log('parseEventRequest failed. InvalidSignatureException => '.var_export($e, true));
+} catch(\LINE\LINEBot\Exception\UnknownEventTypeException $e) {
+  error_log('parseEventRequest failed. UnknownEventTypeException => '.var_export($e, true));
+} catch(\LINE\LINEBot\Exception\UnknownMessageTypeException $e) {
+  error_log('parseEventRequest failed. UnknownMessageTypeException => '.var_export($e, true));
+} catch(\LINE\LINEBot\Exception\InvalidEventRequestException $e) {
+  error_log('parseEventRequest failed. InvalidEventRequestException => '.var_export($e, true));
 }
 
-/*
- *---------------------------------------------------------------
- * SYSTEM DIRECTORY NAME
- *---------------------------------------------------------------
- *
- * This variable must contain the name of your "system" directory.
- * Set the path if it is not in the same directory as this file.
- */
-	$system_path = 'system';
+// 配列に格納された各イベントをループで処理
+foreach ($events as $event) {
+  // MessageEventクラスのインスタンスでなければ処理をスキップ
+  if (!($event instanceof \LINE\LINEBot\Event\MessageEvent)) {
+    error_log('Non message event has come');
+    continue;
+  }
+  // TextMessageクラスのインスタンスの場合
+  if ($event instanceof \LINE\LINEBot\Event\MessageEvent\TextMessage) {
+    // 入力されたテキストを取得
+    $location = $event->getText();
+  }
+  // LocationMessageクラスのインスタンスの場合
+  else if ($event instanceof \LINE\LINEBot\Event\MessageEvent\LocationMessage) {
+    // Google APIにアクセスし緯度経度から住所を取得
+    $jsonString = file_get_contents('https://maps.googleapis.com/maps/api/geocode/json?language=ja&latlng=' . $event->getLatitude() . ',' . $event->getLongitude());
+    // 文字列を連想配列に変換
+    $json = json_decode($jsonString, true);
+    // 住所情報のみを取り出し
+    $addressComponentArray = $json['results'][0]['address_components'];
+    // 要素をループで処理
+    foreach($addressComponentArray as $addressComponent) {
+      // 県名を取得
+      if(in_array('administrative_area_level_1', $addressComponent['types'])) {
+        $prefName = $addressComponent['long_name'];
+        break;
+      }
+    }
+    // 東京と大阪の場合他県と内容が違うので特別な処理
+    if($prefName == '東京都') {
+      $location = '東京';
+    } else if($prefName == '大阪府') {
+      $location = '大阪';
+    // それ以外なら
+    } else {
+      // 要素をループで処理
+      foreach($addressComponentArray as $addressComponent) {
+        // 市名を取得
+        if(in_array('locality', $addressComponent['types']) && !in_array('ward', $addressComponent['types'])) {
+          $location = $addressComponent['long_name'];
+          break;
+        }
+      }
+    }
+  }
 
-/*
- *---------------------------------------------------------------
- * APPLICATION DIRECTORY NAME
- *---------------------------------------------------------------
- *
- * If you want this front controller to use a different "application"
- * directory than the default one you can set its name here. The directory
- * can also be renamed or relocated anywhere on your server. If you do,
- * use an absolute (full) server path.
- * For more info please see the user guide:
- *
- * https://codeigniter.com/user_guide/general/managing_apps.html
- *
- * NO TRAILING SLASH!
- */
-	$application_folder = 'application';
+  // 住所ID用変数
+  $locationId;
+  // XMLファイルをパースするクラス
+  $client = new Goutte\Client();
+  // XMLファイルを取得
+  $crawler = $client->request('GET', 'http://weather.livedoor.com/forecast/rss/primary_area.xml');
+  // 市名のみを抽出しユーザーが入力した市名と比較
+  foreach ($crawler->filter('channel ldWeather|source pref city') as $city) {
+    // 一致すれば住所IDを取得し処理を抜ける
+    if($city->getAttribute('title') == $location || $city->getAttribute('title') . "市" == $location) {
+      $locationId = $city->getAttribute('id');
+      break;
+    }
+  }
+  // 一致するものが無ければ
+  if(empty($locationId)) {
+    // 位置情報が送られた時は県名を取得済みなのでそれを代入
+    if ($event instanceof \LINE\LINEBot\Event\MessageEvent\LocationMessage) {
+      $location = $prefName;
+    }
+    // 候補の配列
+    $suggestArray = array();
+    // 県名を抽出しユーザーが入力した県名と比較
+    foreach ($crawler->filter('channel ldWeather|source pref') as $pref) {
+      // 一致すれば
+      if(strpos($pref->getAttribute('title'), $location) !== false) {
+        // その県に属する市を配列に追加
+        foreach($pref->childNodes as $child) {
+          if($child instanceof DOMElement && $child->nodeName == 'city') {
+            array_push($suggestArray, $child->getAttribute('title'));
+          }
+        }
+        break;
+      }
+    }
+    // 候補が存在する場合
+    if(count($suggestArray) > 0) {
+      // アクションの配列
+      $actionArray = array();
+      //候補を全てアクションにして追加
+      foreach($suggestArray as $city) {
+        array_push($actionArray, new LINE\LINEBot\TemplateActionBuilder\MessageTemplateActionBuilder ($city, $city));
+      }
+      // Buttonsテンプレートを返信
+      $builder = new \LINE\LINEBot\MessageBuilder\TemplateMessageBuilder(
+        '見つかりませんでした。',
+        new \LINE\LINEBot\MessageBuilder\TemplateBuilder\ButtonTemplateBuilder ('見つかりませんでした。', 'もしかして？', null, $actionArray));
+        $bot->replyMessage($event->getReplyToken(), $builder
+      );
+    }
+    // 候補が存在しない場合
+    else {
+      // 正しい入力方法を返信
+      replyTextMessage($bot, $event->getReplyToken(), '入力された地名が見つかりませんでした。市を入力してください。');
+    }
+    // 以降の処理はスキップ
+    continue;
+  }
 
-/*
- *---------------------------------------------------------------
- * VIEW DIRECTORY NAME
- *---------------------------------------------------------------
- *
- * If you want to move the view directory out of the application
- * directory, set the path to it here. The directory can be renamed
- * and relocated anywhere on your server. If blank, it will default
- * to the standard location inside your application directory.
- * If you do move this, use an absolute (full) server path.
- *
- * NO TRAILING SLASH!
- */
-	$view_folder = '';
+  // 住所IDが取得できた場合、その住所の天気情報を取得
+  $jsonString = file_get_contents('http://weather.livedoor.com/forecast/webservice/json/v1?city=' . $locationId);
+  // 文字列を連想配列に変換
+  $json = json_decode($jsonString, true);
 
+  // 形式を指定して天気の更新時刻をパース
+  $date = date_parse_from_format('Y-m-d\TH:i:sP', $json['description']['publicTime']);
 
-/*
- * --------------------------------------------------------------------
- * DEFAULT CONTROLLER
- * --------------------------------------------------------------------
- *
- * Normally you will set your default controller in the routes.php file.
- * You can, however, force a custom routing by hard-coding a
- * specific controller class/function here. For most applications, you
- * WILL NOT set your routing here, but it's an option for those
- * special instances where you might want to override the standard
- * routing in a specific front controller that shares a common CI installation.
- *
- * IMPORTANT: If you set the routing here, NO OTHER controller will be
- * callable. In essence, this preference limits your application to ONE
- * specific controller. Leave the function name blank if you need
- * to call functions dynamically via the URI.
- *
- * Un-comment the $routing array below to use this feature
- */
-	// The directory name, relative to the "controllers" directory.  Leave blank
-	// if your controller is not in a sub-directory within the "controllers" one
-	// $routing['directory'] = '';
+  // 予報が晴れの場合
+  if($json['forecasts'][0]['telop'] == '晴れ') {
+    // 天気情報、更新時刻、晴れのスタンプをまとめて送信
+    replyMultiMessage($bot, $event->getReplyToken(),
+      new \LINE\LINEBot\MessageBuilder\TextMessageBuilder($json['description']['text'] . PHP_EOL . PHP_EOL .
+        '最終更新：' . sprintf('%s月%s日%s時%s分', $date['month'], $date['day'], $date['hour'], $date['minute'])),
+      new \LINE\LINEBot\MessageBuilder\StickerMessageBuilder(2, 513)
+    );
+  // 雨の場合
+  } else if($json['forecasts'][0]['telop'] == '雨') {
+    replyMultiMessage($bot, $event->getReplyToken(),
+      // 天気情報、更新時刻、雨のスタンプをまとめて送信
+      new \LINE\LINEBot\MessageBuilder\TextMessageBuilder($json['description']['text'] . PHP_EOL . PHP_EOL .
+        '最終更新：' . sprintf('%s月%s日%s時%s分', $date['month'], $date['day'], $date['hour'], $date['minute'])),
+      new \LINE\LINEBot\MessageBuilder\StickerMessageBuilder(2, 507)
+    );
+  // 他
+  } else {
+    // 天気情報と更新時刻をまとめて返信
+    replyTextMessage($bot, $event->getReplyToken(), $json['description']['text'] . PHP_EOL . PHP_EOL .
+      '最終更新：' . sprintf('%s月%s日%s時%s分', $date['month'], $date['day'], $date['hour'], $date['minute']));
+  }
+}
 
-	// The controller class file name.  Example:  mycontroller
-	// $routing['controller'] = '';
+// テキストを返信。引数はLINEBot、返信先、テキスト
+function replyTextMessage($bot, $replyToken, $text) {
+  // 返信を行いレスポンスを取得
+  // TextMessageBuilderの引数はテキスト
+  $response = $bot->replyMessage($replyToken, new \LINE\LINEBot\MessageBuilder\TextMessageBuilder($text));
+  // レスポンスが異常な場合
+  if (!$response->isSucceeded()) {
+    // エラー内容を出力
+    error_log('Failed! '. $response->getHTTPStatus . ' ' . $response->getRawBody());
+  }
+}
 
-	// The controller function you wish to be called.
-	// $routing['function']	= '';
+// 画像を返信。引数はLINEBot、返信先、画像URL、サムネイルURL
+function replyImageMessage($bot, $replyToken, $originalImageUrl, $previewImageUrl) {
+  // ImageMessageBuilderの引数は画像URL、サムネイルURL
+  $response = $bot->replyMessage($replyToken, new \LINE\LINEBot\MessageBuilder\ImageMessageBuilder($originalImageUrl, $previewImageUrl));
+  if (!$response->isSucceeded()) {
+    error_log('Failed!'. $response->getHTTPStatus . ' ' . $response->getRawBody());
+  }
+}
 
+// 位置情報を返信。引数はLINEBot、返信先、タイトル、住所、
+// 緯度、経度
+function replyLocationMessage($bot, $replyToken, $title, $address, $lat, $lon) {
+  // LocationMessageBuilderの引数はダイアログのタイトル、住所、緯度、経度
+  $response = $bot->replyMessage($replyToken, new \LINE\LINEBot\MessageBuilder\LocationMessageBuilder($title, $address, $lat, $lon));
+  if (!$response->isSucceeded()) {
+    error_log('Failed!'. $response->getHTTPStatus . ' ' . $response->getRawBody());
+  }
+}
 
-/*
- * -------------------------------------------------------------------
- *  CUSTOM CONFIG VALUES
- * -------------------------------------------------------------------
- *
- * The $assign_to_config array below will be passed dynamically to the
- * config class when initialized. This allows you to set custom config
- * items or override any default config values found in the config.php file.
- * This can be handy as it permits you to share one application between
- * multiple front controller files, with each file containing different
- * config values.
- *
- * Un-comment the $assign_to_config array below to use this feature
- */
-	// $assign_to_config['name_of_config_item'] = 'value of config item';
+// スタンプを返信。引数はLINEBot、返信先、
+// スタンプのパッケージID、スタンプID
+function replyStickerMessage($bot, $replyToken, $packageId, $stickerId) {
+  // StickerMessageBuilderの引数はスタンプのパッケージID、スタンプID
+  $response = $bot->replyMessage($replyToken, new \LINE\LINEBot\MessageBuilder\StickerMessageBuilder($packageId, $stickerId));
+  if (!$response->isSucceeded()) {
+    error_log('Failed!'. $response->getHTTPStatus . ' ' . $response->getRawBody());
+  }
+}
 
+// 動画を返信。引数はLINEBot、返信先、動画URL、サムネイルURL
+function replyVideoMessage($bot, $replyToken, $originalContentUrl, $previewImageUrl) {
+  // VideoMessageBuilderの引数は動画URL、サムネイルURL
+  $response = $bot->replyMessage($replyToken, new \LINE\LINEBot\MessageBuilder\VideoMessageBuilder($originalContentUrl, $previewImageUrl));
+  if (!$response->isSucceeded()) {
+    error_log('Failed! '. $response->getHTTPStatus . ' ' . $response->getRawBody());
+  }
+}
 
+// オーディオファイルを返信。引数はLINEBot、返信先、
+// ファイルのURL、ファイルの再生時間
+function replyAudioMessage($bot, $replyToken, $originalContentUrl, $audioLength) {
+  // AudioMessageBuilderの引数はファイルのURL、ファイルの再生時間
+  $response = $bot->replyMessage($replyToken, new \LINE\LINEBot\MessageBuilder\AudioMessageBuilder($originalContentUrl, $audioLength));
+  if (!$response->isSucceeded()) {
+    error_log('Failed! '. $response->getHTTPStatus . ' ' . $response->getRawBody());
+  }
+}
 
-// --------------------------------------------------------------------
-// END OF USER CONFIGURABLE SETTINGS.  DO NOT EDIT BELOW THIS LINE
-// --------------------------------------------------------------------
+// 複数のメッセージをまとめて返信。引数はLINEBot、
+// 返信先、メッセージ(可変長引数)
+function replyMultiMessage($bot, $replyToken, ...$msgs) {
+  // MultiMessageBuilderをインスタンス化
+  $builder = new \LINE\LINEBot\MessageBuilder\MultiMessageBuilder();
+  // ビルダーにメッセージを全て追加
+  foreach($msgs as $value) {
+    $builder->add($value);
+  }
+  $response = $bot->replyMessage($replyToken, $builder);
+  if (!$response->isSucceeded()) {
+    error_log('Failed!'. $response->getHTTPStatus . ' ' . $response->getRawBody());
+  }
+}
 
-/*
- * ---------------------------------------------------------------
- *  Resolve the system path for increased reliability
- * ---------------------------------------------------------------
- */
+// Buttonsテンプレートを返信。引数はLINEBot、返信先、代替テキスト、
+// 画像URL、タイトル、本文、アクション(可変長引数)
+function replyButtonsTemplate($bot, $replyToken, $alternativeText, $imageUrl, $title, $text, ...$actions) {
+  // アクションを格納する配列
+  $actionArray = array();
+  // アクションを全て追加
+  foreach($actions as $value) {
+    array_push($actionArray, $value);
+  }
+  // TemplateMessageBuilderの引数は代替テキスト、ButtonTemplateBuilder
+  $builder = new \LINE\LINEBot\MessageBuilder\TemplateMessageBuilder(
+    $alternativeText,
+    // ButtonTemplateBuilderの引数はタイトル、本文、
+    // 画像URL、アクションの配列
+    new \LINE\LINEBot\MessageBuilder\TemplateBuilder\ButtonTemplateBuilder ($title, $text, $imageUrl, $actionArray)
+  );
+  $response = $bot->replyMessage($replyToken, $builder);
+  if (!$response->isSucceeded()) {
+    error_log('Failed!'. $response->getHTTPStatus . ' ' . $response->getRawBody());
+  }
+}
 
-	// Set the current directory correctly for CLI requests
-	if (defined('STDIN'))
-	{
-		chdir(dirname(__FILE__));
-	}
+// Confirmテンプレートを返信。引数はLINEBot、返信先、代替テキスト、
+// 本文、アクション(可変長引数)
+function replyConfirmTemplate($bot, $replyToken, $alternativeText, $text, ...$actions) {
+  $actionArray = array();
+  foreach($actions as $value) {
+    array_push($actionArray, $value);
+  }
+  $builder = new \LINE\LINEBot\MessageBuilder\TemplateMessageBuilder(
+    $alternativeText,
+    // Confirmテンプレートの引数はテキスト、アクションの配列
+    new \LINE\LINEBot\MessageBuilder\TemplateBuilder\ConfirmTemplateBuilder ($text, $actionArray)
+  );
+  $response = $bot->replyMessage($replyToken, $builder);
+  if (!$response->isSucceeded()) {
+    error_log('Failed!'. $response->getHTTPStatus . ' ' . $response->getRawBody());
+  }
+}
 
-	if (($_temp = realpath($system_path)) !== FALSE)
-	{
-		$system_path = $_temp.DIRECTORY_SEPARATOR;
-	}
-	else
-	{
-		// Ensure there's a trailing slash
-		$system_path = strtr(
-			rtrim($system_path, '/\\'),
-			'/\\',
-			DIRECTORY_SEPARATOR.DIRECTORY_SEPARATOR
-		).DIRECTORY_SEPARATOR;
-	}
+// Carouselテンプレートを返信。引数はLINEBot、返信先、代替テキスト、
+// ダイアログの配列
+function replyCarouselTemplate($bot, $replyToken, $alternativeText, $columnArray) {
+  $builder = new \LINE\LINEBot\MessageBuilder\TemplateMessageBuilder(
+  $alternativeText,
+  // Carouselテンプレートの引数はダイアログの配列
+  new \LINE\LINEBot\MessageBuilder\TemplateBuilder\CarouselTemplateBuilder (
+   $columnArray)
+  );
+  $response = $bot->replyMessage($replyToken, $builder);
+  if (!$response->isSucceeded()) {
+    error_log('Failed!'. $response->getHTTPStatus . ' ' . $response->getRawBody());
+  }
+}
 
-	// Is the system path correct?
-	if ( ! is_dir($system_path))
-	{
-		header('HTTP/1.1 503 Service Unavailable.', TRUE, 503);
-		echo 'Your system folder path does not appear to be set correctly. Please open the following file and correct this: '.pathinfo(__FILE__, PATHINFO_BASENAME);
-		exit(3); // EXIT_CONFIG
-	}
-
-/*
- * -------------------------------------------------------------------
- *  Now that we know the path, set the main path constants
- * -------------------------------------------------------------------
- */
-	// The name of THIS file
-	define('SELF', pathinfo(__FILE__, PATHINFO_BASENAME));
-
-	// Path to the system directory
-	define('BASEPATH', $system_path);
-
-	// Path to the front controller (this file) directory
-	define('FCPATH', dirname(__FILE__).DIRECTORY_SEPARATOR);
-
-	// Name of the "system" directory
-	define('SYSDIR', basename(BASEPATH));
-
-	// The path to the "application" directory
-	if (is_dir($application_folder))
-	{
-		if (($_temp = realpath($application_folder)) !== FALSE)
-		{
-			$application_folder = $_temp;
-		}
-		else
-		{
-			$application_folder = strtr(
-				rtrim($application_folder, '/\\'),
-				'/\\',
-				DIRECTORY_SEPARATOR.DIRECTORY_SEPARATOR
-			);
-		}
-	}
-	elseif (is_dir(BASEPATH.$application_folder.DIRECTORY_SEPARATOR))
-	{
-		$application_folder = BASEPATH.strtr(
-			trim($application_folder, '/\\'),
-			'/\\',
-			DIRECTORY_SEPARATOR.DIRECTORY_SEPARATOR
-		);
-	}
-	else
-	{
-		header('HTTP/1.1 503 Service Unavailable.', TRUE, 503);
-		echo 'Your application folder path does not appear to be set correctly. Please open the following file and correct this: '.SELF;
-		exit(3); // EXIT_CONFIG
-	}
-
-	define('APPPATH', $application_folder.DIRECTORY_SEPARATOR);
-
-	// The path to the "views" directory
-	if ( ! isset($view_folder[0]) && is_dir(APPPATH.'views'.DIRECTORY_SEPARATOR))
-	{
-		$view_folder = APPPATH.'views';
-	}
-	elseif (is_dir($view_folder))
-	{
-		if (($_temp = realpath($view_folder)) !== FALSE)
-		{
-			$view_folder = $_temp;
-		}
-		else
-		{
-			$view_folder = strtr(
-				rtrim($view_folder, '/\\'),
-				'/\\',
-				DIRECTORY_SEPARATOR.DIRECTORY_SEPARATOR
-			);
-		}
-	}
-	elseif (is_dir(APPPATH.$view_folder.DIRECTORY_SEPARATOR))
-	{
-		$view_folder = APPPATH.strtr(
-			trim($view_folder, '/\\'),
-			'/\\',
-			DIRECTORY_SEPARATOR.DIRECTORY_SEPARATOR
-		);
-	}
-	else
-	{
-		header('HTTP/1.1 503 Service Unavailable.', TRUE, 503);
-		echo 'Your view folder path does not appear to be set correctly. Please open the following file and correct this: '.SELF;
-		exit(3); // EXIT_CONFIG
-	}
-
-	define('VIEWPATH', $view_folder.DIRECTORY_SEPARATOR);
-
-/*
- * --------------------------------------------------------------------
- * LOAD THE BOOTSTRAP FILE
- * --------------------------------------------------------------------
- *
- * And away we go...
- */
-require_once BASEPATH.'core/CodeIgniter.php';
+?>
