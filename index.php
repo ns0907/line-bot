@@ -17,13 +17,13 @@ foreach ($events as $event) {
   // イベントがPostbackEventクラスのインスタンスであれば
   if ($event instanceof \LINE\LINEBot\Event\PostbackEvent) {
     // テキストを返信し次のイベントの処理へ
-    replyTextMessage($bot, $event->getReplyToken(), 'Postback受信「' . $event->getPostbackData() . '」');
+    // replyTextMessage($bot, $event->getReplyToken(), 'Postback受信「' . $event->getPostbackData() . '」');
     continue;
   }
   // テキストを返信
   //$bot->replyText($event->getReplyToken(), 'TextMessage');
   // テキストを返信
-  //replyTextMessage($bot, $event->getReplyToken(), 'TextMessage');
+  replyTextMessage($bot, $event->getReplyToken(), 'TextMessage');
   // 画像を返信
   //replyImageMessage($bot, $event->getReplyToken(), 'https://' . $_SERVER['HTTP_HOST'] . '/imgs/original.jpg', 'https://' . $_SERVER['HTTP_HOST'] . '/imgs/preview.jpg');
   // 位置情報を返信
