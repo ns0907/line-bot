@@ -43,6 +43,8 @@ foreach ($events as $event) {
     continue;
   }
 
+  $location = $event->getText();
+
   // 住所ID用変数
   $locationId;
   // XMLファイルをパースするクラス
