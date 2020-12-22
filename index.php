@@ -27,7 +27,7 @@ foreach ($events as $event) {
   // テキストを返信
   //$bot->replyText($event->getReplyToken(), 'TextMessage');
   // テキストを返信
-  // replyTextMessage($bot, $event->getReplyToken(), 'TextMessage');
+  replyTextMessage($bot, $event->getReplyToken(), 'TextMessage');
   // 画像を返信
   //replyImageMessage($bot, $event->getReplyToken(), 'https://' . $_SERVER['HTTP_HOST'] . '/imgs/original.jpg', 'https://' . $_SERVER['HTTP_HOST'] . '/imgs/preview.jpg');
   // 位置情報を返信
