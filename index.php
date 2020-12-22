@@ -3,11 +3,14 @@
 // Composerでインストールしたライブラリを一括読み込み
 require_once __DIR__ . '/vendor/autoload.php';
 
+$channel_access_token = '3PUxCrwuypqQVwLnpyow3yvza6ymxJC8Ipjlly+HtwawtJlD1XU48wuHxH0VNqCnO0F7M0uiNCA9+zphgQGEfb/PCwK43OpmunW4KYfU43rRGiTI4oCQIOSm7iX6ZBVg9od/e52Ugunh3UORavfSVwdB04t89/1O/w1cDnyilFU=';
+$channel_secret = 'd5c9cf96df08efa8441c3bea0260bb74';
+
 // アクセストークンを使いCurlHTTPClientをインスタンス化
-$httpClient = new \LINE\LINEBot\HTTPClient\CurlHTTPClient(getenv('CHANNEL_ACCESS_TOKEN'));
+$httpClient = new \LINE\LINEBot\HTTPClient\CurlHTTPClient($channel_access_token);
 
 // CurlHTTPClientとシークレットを使いLINEBotをインスタンス化
-$bot = new \LINE\LINEBot($httpClient, ['channelSecret' => getenv('CHANNEL_SECRET')]);
+$bot = new \LINE\LINEBot($httpClient, ['channelSecret' => $channel_secret]);
 
 // LINE Messaging APIがリクエストに付与した署名を取得
 $signature = $_SERVER['HTTP_' . \LINE\LINEBot\Constant\HTTPHeader::LINE_SIGNATURE];
