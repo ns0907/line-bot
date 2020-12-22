@@ -21,7 +21,7 @@ foreach ($events as $event) {
   // イベントがPostbackEventクラスのインスタンスであれば
   if ($event instanceof \LINE\LINEBot\Event\PostbackEvent) {
     // テキストを返信し次のイベントの処理へ
-    // replyTextMessage($bot, $event->getReplyToken(), 'Postback受信「' . $event->getPostbackData() . '」');
+    replyTextMessage($bot, $event->getReplyToken(), 'Postback受信「' . $event->getPostbackData() . '」');
     continue;
   }
   // テキストを返信
