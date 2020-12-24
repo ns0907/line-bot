@@ -54,7 +54,7 @@ foreach ($events as $event) {
     ];
 
   // Imagemapを返信
-  $this->replyImagemap($bot, $event->getReplyToken(), '盤面', $stones);
+  $this->replyImagemap($bot, $event->getReplyToken(), '盤面', $stones, NULL);
 
   // 盤面のImagemapを返信
   function replyImagemap($bot, $replyToken, $alternativeText, $stones, $lastStones)
