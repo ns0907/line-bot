@@ -40,44 +40,68 @@ foreach ($events as $event) {
     continue;
   }
 
-  // ゲーム開始時の石の配置
-  $stones =
-    [
-      [0, 0, 0, 0, 0, 0, 0, 0],
-      [0, 0, 0, 0, 0, 0, 0, 0],
-      [0, 0, 0, 0, 0, 0, 0, 0],
-      [0, 0, 0, 1, 2, 0, 0, 0],
-      [0, 0, 0, 2, 1, 0, 0, 0],
-      [0, 0, 0, 0, 0, 0, 0, 0],
-      [0, 0, 0, 0, 0, 0, 0, 0],
-      [0, 0, 0, 0, 0, 0, 0, 0],
-    ];
+  // TextMessageクラスのインスタンスの場合
+  if ($event instanceof \LINE\LINEBot\Event\MessageEvent\TextMessage) {
+    // 入力されたテキストを取得
+    $location = $event->getText();
 
-  // Imagemapを返信
-  $this->replyImagemap($bot, $event->getReplyToken(), '盤面', $stones);
-
-  // 盤面のImagemapを返信
-  function replyImagemap($bot, $replyToken, $alternativeText, $stones, $lastStones)
-  {
-    // アクションの配列
-    $actionArray = array();
-    // 1つ以上のエリアが必要なためダミーのタップ可能エリアを追加
-    array_push($actionArray, new LINE\LINEBot\ImagemapActionBuilder\ImagemapMessageActionBuilder(
-      '-',
-      new LINE\LINEBot\ImagemapActionBuilder\AreaBuilder(0, 0, 1, 1)
-    ));
-    // ImagemapMessageBuilderの引数は画像のURL、代替テキスト、
-    // 基本比率サイズ(幅は1040固定)、アクションの配列
-    $imagemapMessageBuilder = new \LINE\LINEBot\MessageBuilder\ImagemapMessageBuilder(
-      'https://' . $_SERVER['HTTP_HOST'] . '/images/' . urlencode(json_encode($stones) . '|' . json_encode($lastStones)) . '/' . uniqid(),
-      $alternativeText,
-      new LINE\LINEBot\MessageBuilder\Imagemap\BaseSizeBuilder(1040, 1040),
-      $actionArray
-    );
-
-    $response = $bot->replyMessage($replyToken, $imagemapMessageBuilder);
-    if (!$response->isSucceeded()) {
-      error_log('Failed!' . $response->getHTTPStatus . ' ' . $response->getRawBody());
+    // 住所ID用変数
+    $locationId;
+    // XMLファイルをパースするクラス
+    $client = new Goutte\Client();
+    // XMLファイルを取得
+    $crawler = $client->request('GET', 'http://weather.livedoor.com/forecast/rss/primary_area.xml');
+    // 市名のみを抽出しユーザーが入力した市名と比較
+    foreach ($crawler->filter('channel ldWeather|source pref city') as $city) {
+      // 一致すれば住所IDを取得し処理を抜ける
+      if ($city->getAttribute('title') == $location || $city->getAttribute('title') . "市" == $location) {
+        $locationId = $city->getAttribute('id');
+        break;
+      }
+    }
+    // 一致するものが無ければ
+    if (empty($locationId)) {
+      // 位置情報が送られた時は県名を取得済みなのでそれを代入
+      if ($event instanceof \LINE\LINEBot\Event\MessageEvent\LocationMessage) {
+        $location = $prefName;
+      }
+      // 候補の配列
+      $suggestArray = array();
+      // 県名を抽出しユーザーが入力した県名と比較
+      foreach ($crawler->filter('channel ldWeather|source pref') as $pref) {
+        // 一致すれば
+        if (strpos($pref->getAttribute('title'), $location) !== false) {
+          // その県に属する市を配列に追加
+          foreach ($pref->childNodes as $child) {
+            if ($child instanceof DOMElement && $child->nodeName == 'city') {
+              array_push($suggestArray, $child->getAttribute('title'));
+            }
+          }
+          break;
+        }
+      }
+      // 候補が存在する場合
+      if (count($suggestArray) > 0) {
+        // アクションの配列
+        $actionArray = array();
+        //候補を全てアクションにして追加
+        foreach ($suggestArray as $city) {
+          array_push($actionArray, new LINE\LINEBot\TemplateActionBuilder\MessageTemplateActionBuilder($city, $city));
+        }
+        // Buttonsテンプレートを返信
+        $builder = new \LINE\LINEBot\MessageBuilder\TemplateMessageBuilder(
+          '見つかりませんでした。',
+          new \LINE\LINEBot\MessageBuilder\TemplateBuilder\ButtonTemplateBuilder('見つかりませんでした。', 'もしかして？', null, $actionArray)
+        );
+        $bot->replyMessage($event->getReplyToken(), $builder);
+      }
+      // 候補が存在しない場合
+      else {
+        // 正しい入力方法を返信
+        replyTextMessage($bot, $event->getReplyToken(), '入力された地名が見つかりませんでした。市を入力してください。');
+      }
+      // 以降の処理はスキップ
+      continue;
     }
   }
 }
