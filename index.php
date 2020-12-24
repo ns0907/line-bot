@@ -39,8 +39,9 @@ foreach ($events as $event) {
     error_log('Non text message has come');
     continue;
   }
-  // オウム返し
-  $bot->replyText($event->getReplyToken(), $event->getText());
+
+  // テキストを返信
+  $bot->replyText($event->getReplyToken(), 'TextMessage');
 }
 
 // テキストを返信。引数はLINEBot、返信先、テキスト
