@@ -8,56 +8,30 @@
 
 <body>
 
-    <h1>jQueryのAjaxをPHPで使うやつ</h1>
-    <form method="post">
-        <p><input id="send" value="送信" type="submit"></p>
-    </form>
-
-    <div id="XMLHttpRequest"></div><!-- ステータスコード -->
-    <div id="textStatus"></div><!-- エラー情報 -->
-    <div id="errorThrown"></div><!-- 例外情報 -->
-
-    <div id="result"></div><!-- 返してきたデータを表示 -->
-
-
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
+    <div class="result">ここにajaxの結果を書き換えます</div>
+    <input type="button" class="sample_btn" value="ajax通信で取得する">
+  
     <script>
-        $(document).ready(function () {
-
-            //送信ボタンをクリック
-            $('#send').click(function () {
-
-                //POSTメソッドで送るデータを定義する
-                //var data = {パラメータ : 値};
-                //   var data = {request : $('#request').val()};
-
-                //Ajax通信メソッド
-                //type : HTTP通信の種類(POSTとかGETとか)
-                //url  : リクエスト送信先のURL
-                //data : サーバに送信する値
-                $.ajax({
-                    //POST通信
-                    type: "POST",
-                    //ここでデータの送信先URLを指定します。
-                    url: "https://bot-starter-nakahira.herokuapp.com/send.php",
-                    data: { key1: 'adress', key2: 'name' },
-
-                    //処理が成功したら
-                    success: function (data, dataType) {
-                        //HTMLファイル内の該当箇所にレスポンスデータを追加する場合
-                        $('#sample').html("送信成功しました");
-                    },
-                    //処理がエラーであれば
-                    error: function () {
-                        alert('通信エラー');
-                    }
-                });
-                //submitによる画面リロードを防いでいます。
-                return false;
-
-            });
+      $(function () {
+        //.sampleをクリックしてajax通信を行う
+        $('.sample_btn').click(function () {
+          $.ajax({
+            url: 'test.html',
+            /* 自サイトのドメインであれば、https://kinocolog.com/ajax/test.html というURL指定も可 */
+            type: 'GET',
+            dataType: 'html'
+          }).done(function (data) {
+            /* 通信成功時 */
+            $('.result').html(data); //取得したHTMLを.resultに反映
+  
+          }).fail(function (XMLHttpRequest, textStatus, errorThrown) {
+            alert('error!!!');
+            console.log("XMLHttpRequest : " + XMLHttpRequest.status);
+            console.log("textStatus     : " + textStatus);
+            console.log("errorThrown    : " + errorThrown.message);
+          });
         });
-
+      });
     </script>
 
 
