@@ -10,58 +10,55 @@
 
     <h1>jQueryのAjaxをPHPで使うやつ</h1>
     <form method="post">
-      <p><input id="request" size="10" maxlength="10"></p>
-      <p><input id="send" value="送信" type="submit"></p>
+        <p><input id="send" value="送信" type="submit"></p>
     </form>
-  
+
     <div id="XMLHttpRequest"></div><!-- ステータスコード -->
     <div id="textStatus"></div><!-- エラー情報 -->
     <div id="errorThrown"></div><!-- 例外情報 -->
-  
+
     <div id="result"></div><!-- 返してきたデータを表示 -->
-  
-  
-  <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
-  <script>
-  $(document).ready(function() {
-  
-    //送信ボタンをクリック
-    $('#send').click(function(){
-  
-      //POSTメソッドで送るデータを定義する
-      //var data = {パラメータ : 値};
-      var data = {request : $('#request').val()};
-  
-      //Ajax通信メソッド
-      //type : HTTP通信の種類(POSTとかGETとか)
-      //url  : リクエスト送信先のURL
-      //data : サーバに送信する値
-      $.ajax({
-        type: "POST",
-        url: "send.php",
-        data: data,
-        //Ajax通信が成功した場合に呼び出されるメソッド
-        success: function(data, dataType){
-          //デバッグ用 アラートとコンソール
-          alert(data);
-          console.log(data);
-  
-          //出力する部分
-          $('#result').html(data);
-        },
-        //Ajax通信が失敗した場合に呼び出されるメソッド
-        error: function(XMLHttpRequest, textStatus, errorThrown){
-          alert('Error : ' + errorThrown);
-          $("#XMLHttpRequest").html("XMLHttpRequest : " + XMLHttpRequest.status);
-          $("#textStatus").html("textStatus : " + textStatus);
-          $("#errorThrown").html("errorThrown : " + errorThrown);
-        }
-      });
-      return false;
-    });
-  });
-  
-  </script>
+
+
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
+    <script>
+        $(document).ready(function () {
+
+            //送信ボタンをクリック
+            $('#send').click(function () {
+
+                //POSTメソッドで送るデータを定義する
+                //var data = {パラメータ : 値};
+                //   var data = {request : $('#request').val()};
+
+                //Ajax通信メソッド
+                //type : HTTP通信の種類(POSTとかGETとか)
+                //url  : リクエスト送信先のURL
+                //data : サーバに送信する値
+                $.ajax({
+                    //POST通信
+                    type: "POST",
+                    //ここでデータの送信先URLを指定します。
+                    url: "send.php",
+                    data: { key1: 'adress', key2: 'name' }
+
+                    //処理が成功したら
+                    success: function (data, dataType) {
+                        //HTMLファイル内の該当箇所にレスポンスデータを追加する場合
+                        $('#sample').html("送信成功しました");
+                    },
+                    //処理がエラーであれば
+                    error: function () {
+                        alert('通信エラー');
+                    }
+                });
+                //submitによる画面リロードを防いでいます。
+                return false;
+
+            });
+        });
+
+    </script>
 
 
 
