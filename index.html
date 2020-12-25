@@ -11,13 +11,17 @@
     select {
       margin-bottom: 10px;
     }
+    #info {
+      color:red;
+      font-size:25px;
+    }
   </style>
 </head>
 
 <body>
-
+  <h1>ajaxテスト</h1>
   <form method="post">
-    <h1>入力フォーム</h1>
+    <h2>入力フォーム</h2>
     <div id="info"></div>
     <div class="form-group">
       <label>氏名</label>
@@ -25,7 +29,7 @@
     </div>
     <label>Eメールアドレス</label>
     <div class="form-group">
-      <input type="text"  class="form-control" id="email" />
+      <input type="text" class="form-control" id="email" />
     </div>
     <button type="button" class="btn btn-primary" id="send">送信</button>
   </form>
@@ -33,14 +37,18 @@
 
 
 
-
+  <h2></h2>
   <select id="sel">
     <option> --場所を選ぶ-- </option>
     <option value="kyoto">京都</option>
     <option value="osaka">大阪</option>
     <option value="kobe">神戸</option>
   </select>
-  <div id="mes">集合場所は<span id="pos"><!-- ここに集合場所が入る --></span>、集合時刻は<span id="time"><!-- ここに集合時刻が入る --></span>となります。</div>
+  <div id="mes">集合場所は<span id="pos">
+      <!-- ここに集合場所が入る -->
+    </span>、集合時刻は<span id="time">
+      <!-- ここに集合時刻が入る -->
+    </span>となります。</div>
 
 
   <script>
@@ -64,25 +72,25 @@
       })
     })
 
-    $(function() {
-    $('#send').click (function () {
+    $(function () {
+      $('#send').click(function () {
 
         $.ajax({
-            url: "api/ajax/post2",
-            type: "post",
-            dataType: "text",
-            data:{'name':$('#name').val(),'email':$('#email').val()}
+          url: "api/ajax/post2",
+          type: "post",
+          dataType: "text",
+          data: { 'name': $('#name').val(), 'email': $('#email').val() }
 
         }).done(function (response) {
-            alert("success");
-            var array = JSON.parse(response);
-            $("div#info").html('<div class="alert alert-success" role="alert" id="info">' + array + '</div>');
+          alert("success");
+          var array = JSON.parse(response);
+          $("div#info").html('<div class="alert alert-success" role="alert" id="info">' + array + '</div>');
 
-        }).fail(function (xhr,textStatus,errorThrown) {
-            alert('error');
+        }).fail(function (xhr, textStatus, errorThrown) {
+          alert('error');
         });
+      });
     });
-});
   </script>
 
 </body>
