@@ -10,30 +10,42 @@
 
 <body>
 
-  <div class="result">ここにajaxの結果を書き換えます</div>
-  <input type="button" class="sample_btn" value="ajax通信で取得する">
+  <select id="sel">
+    <option> --場所を選ぶ-- </option>
+    <option value="kyoto">京都</option>
+    <option value="osaka">大阪</option>
+    <option value="kobe">神戸</option>
+  </select>
+  <div id="mes">
+    　　　集合場所は<span id="pos">
+      <!-- ここに集合場所が入る -->
+    </span>、
+    　　　集合時刻は<span id="time">
+      <!-- ここに集合時刻が入る -->
+    </span>となります。
+  </div>
+
 
   <script>
+    let optval;
     $(function () {
-      //.sampleをクリックしてajax通信を行う
-      $('.sample_btn').click(function () {
-        $.ajax({
-          url: 'test.html',
-          /* 自サイトのドメインであれば、https://kinocolog.com/ajax/test.html というURL指定も可 */
-          type: 'GET',
-          dataType: 'html'
+      $('#sel').on("change", function () {
+        optval = $(this).val(); //選択したメニューの値
+        $.post({
+          url: 'ajax_getData.php',
+          data: {
+            'opt': optval
+          },
+          dataType: 'json', //必須。json形式で返すように設定
         }).done(function (data) {
-          /* 通信成功時 */
-          $('.result').html(data); //取得したHTMLを.resultに反映
-
+          //連想配列のプロパティがそのままjsonオブジェクトのプロパティとなっている
+          $("#pos").text(data.position); //取得した集合場所の値を、html上のID値がposの箇所に代入。
+          $("#time").text(data.ap_time); //取得した集合時刻の値を、html上のID値がtimeの箇所に代入。
         }).fail(function (XMLHttpRequest, textStatus, errorThrown) {
-          alert('error!!!');
-          console.log("XMLHttpRequest : " + XMLHttpRequest.status);
-          console.log("textStatus     : " + textStatus);
-          console.log("errorThrown    : " + errorThrown.message);
-        });
-      });
-    });
+          alert(errorThrown);
+        })
+      })
+    })
   </script>
 
 </body>
