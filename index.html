@@ -16,6 +16,24 @@
 
 <body>
 
+  <form method="post">
+    <h1>入力フォーム</h1>
+    <div id="info"></div>
+    <div class="form-group">
+      <label>氏名</label>
+      <input type="text" class="form-control" id="name" />
+    </div>
+    <label>Eメールアドレス</label>
+    <div class="form-group">
+      <input type="text"  class="form-control" id="email" />
+    </div>
+    <button type="button" class="btn btn-primary" id="send">送信</button>
+  </form>
+
+
+
+
+
   <select id="sel">
     <option> --場所を選ぶ-- </option>
     <option value="kyoto">京都</option>
@@ -45,6 +63,26 @@
         })
       })
     })
+
+    $(function() {
+    $('#send').click (function () {
+
+        $.ajax({
+            url: "api/ajax/post2",
+            type: "post",
+            dataType: "text",
+            data:{'name':$('#name').val(),'email':$('#email').val()}
+
+        }).done(function (response) {
+            alert("success");
+            var array = JSON.parse(response);
+            $("div#info").html('<div class="alert alert-success" role="alert" id="info">' + array + '</div>');
+
+        }).fail(function (xhr,textStatus,errorThrown) {
+            alert('error');
+        });
+    });
+});
   </script>
 
 </body>
