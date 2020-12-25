@@ -141,32 +141,4 @@
         </table>
     </div>
 
-    <script>
-        $(function () {
-
-            function post() {
-                $.ajax({
-                    //POST通信
-                    type: "POST",
-                    //ここでデータの送信先URLを指定します。
-                    url: "post.php",
-                    data: { key1: 'adress', key2: 'name' }
-
-                   //処理が成功したら
-                    success: function (data, dataType) {
-                        //HTMLファイル内の該当箇所にレスポンスデータを追加する場合
-                        $('#sample').html("送信成功しました");
-                    },
-                    //処理がエラーであれば
-                    error: function () {
-                        alert('通信エラー');
-                    }
-                });
-                //submitによる画面リロードを防いでいます。
-                return false;
-            }
-
-        });
-    </script>
-
 </body>
