@@ -32,7 +32,7 @@
       $('#sel').on("change", function () {
         optval = $(this).val(); //選択したメニューの値
         $.post({
-          url: 'ajax_getData.php',
+          url: 'api/ajax/post',
           data: {
             'opt': optval
           },
