@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="utf-8">
+  <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+
+  <title>ajax</title>
+
+  <style>
+    select {
+      margin-bottom: 10px;
+    }
+    #info {
+      color:blue;
+      font-size:25px;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>ajaxテスト</h1>
+  <form method="post">
+    <h2>入力フォーム</h2>
+    <div id="info"></div>
+    <div class="form-group">
+      <label>氏名</label>
+      <input type="text" class="form-control" id="name" />
+    </div>
+    <label>Eメールアドレス</label>
+    <div class="form-group">
+      <input type="text" class="form-control" id="email" />
+    </div>
+    <button type="button" class="btn btn-primary" id="send">送信</button>
+  </form>
+
+
+
+
+  <h2>select</h2>
+  <select id="sel">
+    <option> --場所を選ぶ-- </option>
+    <option value="kyoto">京都</option>
+    <option value="osaka">大阪</option>
+    <option value="kobe">神戸</option>
+  </select>
+  <div id="mes">集合場所は<span id="pos">
+      <!-- ここに集合場所が入る -->
+    </span>、集合時刻は<span id="time">
+      <!-- ここに集合時刻が入る -->
+    </span>となります。</div>
+
+
+  <script>
+    let optval;
+    $(function () {
+      $('#sel').on("change", function () {
+        optval = $(this).val(); //選択したメニューの値
+        $.post({
+          url: 'api/ajax/post',
+          data: {
+            'opt': optval
+          },
+          dataType: 'json', //必須。json形式で返すように設定
+        }).done(function (data) {
+          //連想配列のプロパティがそのままjsonオブジェクトのプロパティとなっている
+          $("#pos").text(data.position); //取得した集合場所の値を、html上のID値がposの箇所に代入。
+          $("#time").text(data.ap_time); //取得した集合時刻の値を、html上のID値がtimeの箇所に代入。
+        }).fail(function (XMLHttpRequest, textStatus, errorThrown) {
+          alert(errorThrown);
+        })
+      })
+    })
+
+    $(function () {
+      $('#send').click(function () {
+
+        $.ajax({
+          url: "api/ajax/post2",
+          type: "post",
+          dataType: "text",
+          data: { 'name': $('#name').val(), 'email': $('#email').val() }
+
+        }).done(function (response) {
+          alert("success");
+          var array = JSON.parse(response);
+          $("div#info").html('<div class="alert alert-success" role="alert" id="info">' + array + '</div>');
+
+        }).fail(function (xhr, textStatus, errorThrown) {
+          alert('error');
+        });
+      });
+    });
+  </script>
+
+</body>
+
+</html>
